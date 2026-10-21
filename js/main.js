@@ -12,6 +12,8 @@
   })();
   var PRODUTOS = (catalogoSalvo && catalogoSalvo.produtos) || window.VTT_PRODUTOS || [];
   var CATEGORIAS = (catalogoSalvo && catalogoSalvo.categorias) || window.VTT_CATEGORIAS || [];
+  // Nome da categoria fixa de promoção (vem do Gestor; null quando oculta ou sem produto em promoção)
+  var CATEGORIA_PROMO = (catalogoSalvo && catalogoSalvo.promocao) || null;
   var STORAGE_TESTE = 'vtt_leads_teste';   // "planilha" falsa do modo teste
   var STORAGE_CARRINHO = 'vtt_carrinho';    // carrinho salvo no navegador
   var QTD_MAX = 99;
@@ -80,6 +82,12 @@
     return (p && p.imagem) ? p.imagem : SEM_IMAGEM;
   }
 
+  // Fotos do produto para a galeria (a 1ª é a capa)
+  function fotosDe(p) {
+    if (p && Array.isArray(p.fotos) && p.fotos.length) return p.fotos;
+    return [imagemDe(p)];
+  }
+
   // Imagem que não carregou (link quebrado, arquivo apagado): troca pela genérica
   document.addEventListener('error', function (e) {
     var img = e.target;
@@ -129,22 +137,45 @@
   var barraCategorias = document.getElementById('categorias');
   var listaProdutos = document.getElementById('lista-produtos');
   var categoriaAtiva = 'Todos';
+  var termoBusca = '';   // texto da barra de busca do topo
+
+  // Minúsculas e sem acento: "Calça" encontra "calca" e vice-versa
+  function normalizar(texto) {
+    return String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  // Todas as palavras digitadas precisam aparecer no nome, na descrição ou na categoria
+  function combinaComBusca(p, termo) {
+    var alvo = normalizar(p.nome + ' ' + (p.descricao || '') + ' ' + (p.categoria || ''));
+    return normalizar(termo).split(/\s+/).every(function (palavra) { return alvo.indexOf(palavra) >= 0; });
+  }
 
   function cardProduto(p) {
+    var esgotado = estoqueDe(p) === 0;
+    var off = percentualOff(p);
     return (
-      '<article class="lp-card" data-id="' + escapar(p.id) + '">' +
+      '<article class="lp-card' + (esgotado ? ' is-esgotado' : '') + (p.preco_de ? ' is-promo' : '') + '" data-id="' + escapar(p.id) + '">' +
         '<div class="lp-card__media">' +
-          '<img src="' + escapar(imagemDe(p)) + '" alt="' + escapar(p.nome) + '" loading="lazy" data-produto-img />' +
+          '<img src="' + escapar(imagemDe(p)) + '" alt="' + escapar(p.nome) + '" loading="lazy" data-produto-img' +
+            ' data-ampliar role="button" tabindex="0" aria-label="Ver fotos de ' + escapar(p.nome) + '" />' +
           '<span class="lp-card__tag">' + escapar(p.categoria) + '</span>' +
+          (off > 0 ? '<span class="lp-card__off">-' + off + '%</span>' : '') +
+          (fotosDe(p).length > 1
+            ? '<span class="lp-card__fotos" aria-label="' + fotosDe(p).length + ' fotos">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg>' +
+                fotosDe(p).length + '</span>'
+            : '') +
         '</div>' +
         '<div class="lp-card__body">' +
           '<h3 class="lp-card__name">' + escapar(p.nome) + '</h3>' +
           '<p class="lp-card__desc">' + escapar(p.descricao) + '</p>' +
-          '<div class="lp-card__price">' + formatarPreco(p.preco) + '</div>' +
+          '<div class="lp-card__price">' + precoHtml(p) + '</div>' +
+          textoEstoque(p) +
           '<div class="lp-card__buy">' +
-            seletorQtd(1, 'Quantidade de ' + p.nome) +
-            '<button type="button" class="btn btn-primary lp-card__add" data-add="' + escapar(p.id) + '">' +
-              '<svg width="18" height="18" aria-hidden="true"><use href="#i-cart" /></svg> Adicionar' +
+            seletorQtd(1, 'Quantidade de ' + p.nome, maxDe(p.id), esgotado) +
+            '<button type="button" class="btn btn-primary lp-card__add" data-add="' + escapar(p.id) + '"' + (esgotado ? ' disabled' : '') + '>' +
+              '<svg width="18" height="18" aria-hidden="true"><use href="#i-cart" /></svg>' + (esgotado ? ' Esgotado' : ' Adicionar') +
             '</button>' +
           '</div>' +
         '</div>' +
@@ -153,34 +184,70 @@
   }
 
   // Seletor de quantidade (− 1 +) usado no card e no carrinho
-  function seletorQtd(valor, rotulo) {
+  function seletorQtd(valor, rotulo, max, desligado) {
+    if (max == null) max = QTD_MAX;
+    var off = desligado ? ' disabled' : '';
     return (
       '<div class="qty" role="group" aria-label="' + escapar(rotulo) + '">' +
-        '<button type="button" class="qty__btn" data-qtd="-1" aria-label="Diminuir">−</button>' +
-        '<input class="qty__input" type="number" inputmode="numeric" min="1" max="' + QTD_MAX + '" value="' + valor + '" aria-label="Quantidade" />' +
-        '<button type="button" class="qty__btn" data-qtd="1" aria-label="Aumentar">+</button>' +
+        '<button type="button" class="qty__btn" data-qtd="-1" aria-label="Diminuir"' + off + '>−</button>' +
+        '<input class="qty__input" type="number" inputmode="numeric" min="1" max="' + Math.max(1, max) + '" value="' + valor + '" aria-label="Quantidade"' + off + ' />' +
+        '<button type="button" class="qty__btn" data-qtd="1" aria-label="Aumentar"' + (desligado || valor >= max ? ' disabled' : '') + '>+</button>' +
       '</div>'
     );
   }
 
-  function limitarQtd(n) {
+  // Estoque que veio do Gestor (null = desconhecido, ex.: lista reserva do produtos.js)
+  function estoqueDe(p) {
+    return p && typeof p.estoque === 'number' ? Math.max(0, p.estoque) : null;
+  }
+
+  // Maior quantidade que dá para pedir de um produto
+  function maxDe(id) {
+    var e = estoqueDe(produtoPorId(id));
+    return e == null ? QTD_MAX : Math.min(QTD_MAX, e);
+  }
+
+  function limitarQtd(n, max) {
+    if (max == null) max = QTD_MAX;
     n = parseInt(n, 10);
     if (isNaN(n) || n < 1) return 1;
-    return Math.min(n, QTD_MAX);
+    return Math.max(1, Math.min(n, max));
+  }
+
+  function textoEstoque(p) {
+    var e = estoqueDe(p);
+    if (e == null) return '';
+    if (e === 0) return '<p class="lp-card__estoque is-zero">Esgotado</p>';
+    if (e <= 3) return '<p class="lp-card__estoque is-pouco">' + (e === 1 ? 'Última unidade!' : 'Últimas ' + e + ' unidades') + '</p>';
+    return '<p class="lp-card__estoque">' + e + ' em estoque</p>';
+  }
+
+  function precoHtml(p) {
+    if (!p.preco_de) return formatarPreco(p.preco);
+    return '<span class="lp-card__de">De ' + formatarPreco(p.preco_de) + '</span> Por ' + formatarPreco(p.preco);
+  }
+
+  function percentualOff(p) {
+    return p.preco_de ? Math.round((1 - p.preco / p.preco_de) * 100) : 0;
   }
 
   function renderizarProdutos() {
-    var visiveis = categoriaAtiva === 'Todos'
+    var visiveis = termoBusca
+      ? PRODUTOS.filter(function (p) { return combinaComBusca(p, termoBusca); })
+      : categoriaAtiva === 'Todos'
       ? PRODUTOS
-      : PRODUTOS.filter(function (p) { return p.categoria === categoriaAtiva; });
+      : categoriaAtiva === CATEGORIA_PROMO
+        ? PRODUTOS.filter(function (p) { return !!p.preco_de; })
+        : PRODUTOS.filter(function (p) { return p.categoria === categoriaAtiva; });
     listaProdutos.innerHTML = visiveis.map(cardProduto).join('');
+    mostrarResultadoBusca(visiveis.length);
     if (typeof Carrinho !== 'undefined') sincronizarCards(Carrinho.qtdDe);
   }
 
   function renderizarCategorias() {
     barraCategorias.innerHTML = ['Todos'].concat(CATEGORIAS).map(function (cat) {
-      var ativa = cat === categoriaAtiva;
-      return '<button type="button" role="tab" class="category-chip' + (ativa ? ' active' : '') +
+      var ativa = !termoBusca && cat === categoriaAtiva;
+      return '<button type="button" role="tab" class="category-chip' + (ativa ? ' active' : '') + (cat === CATEGORIA_PROMO ? ' is-promo' : '') +
         '" aria-selected="' + ativa + '" data-categoria="' + escapar(cat) + '">' + escapar(cat) + '</button>';
     }).join('');
   }
@@ -189,9 +256,98 @@
     var botao = e.target.closest('[data-categoria]');
     if (!botao) return;
     categoriaAtiva = botao.getAttribute('data-categoria');
+    if (termoBusca) limparBusca(true);
     renderizarCategorias();
     renderizarProdutos();
   });
+
+  /* ---------------- Busca no topo ---------------- */
+
+  var topo = document.querySelector('.lp-top');
+  var campoBusca = document.getElementById('busca-produtos');
+  var infoBusca = document.getElementById('busca-info');
+  var tempoBusca = null;
+
+  function mostrarResultadoBusca(qtd) {
+    if (!infoBusca) return;
+    if (!termoBusca) { infoBusca.hidden = true; return; }
+    infoBusca.innerHTML = (qtd
+      ? '<span><strong>' + qtd + '</strong> ' + (qtd === 1 ? 'produto encontrado' : 'produtos encontrados') +
+        ' para “' + escapar(termoBusca) + '”</span>'
+      : '<span>Nenhum produto encontrado para “' + escapar(termoBusca) + '”. Tente outra palavra.</span>') +
+      '<button type="button" class="lp-busca-info__limpar" data-limpar-busca>Limpar busca</button>';
+    infoBusca.hidden = false;
+  }
+
+  function aplicarBusca(texto) {
+    termoBusca = String(texto || '').trim();
+    renderizarCategorias();
+    renderizarProdutos();
+  }
+
+  // semRedesenhar: quando quem chama já vai redesenhar a vitrine
+  function limparBusca(semRedesenhar) {
+    if (campoBusca) campoBusca.value = '';
+    termoBusca = '';
+    if (!semRedesenhar) { renderizarCategorias(); renderizarProdutos(); }
+  }
+
+  function irParaProdutos() {
+    document.getElementById('produtos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function abrirBuscaCelular() {
+    topo.classList.add('is-buscando');
+    document.getElementById('busca-abrir').setAttribute('aria-expanded', 'true');
+    campoBusca.focus();
+  }
+
+  function fecharBuscaCelular() {
+    topo.classList.remove('is-buscando');
+    document.getElementById('busca-abrir').setAttribute('aria-expanded', 'false');
+  }
+
+  if (campoBusca) {
+    // Filtra enquanto digita (com uma pequena espera para não piscar)
+    campoBusca.addEventListener('input', function () {
+      clearTimeout(tempoBusca);
+      var texto = campoBusca.value;
+      tempoBusca = setTimeout(function () {
+        var comecou = !termoBusca && texto.trim();
+        aplicarBusca(texto);
+        if (comecou) irParaProdutos();
+      }, 180);
+    });
+
+    campoBusca.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        limparBusca();
+        fecharBuscaCelular();
+        campoBusca.blur();
+      }
+    });
+
+    document.getElementById('busca-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      clearTimeout(tempoBusca);
+      aplicarBusca(campoBusca.value);
+      irParaProdutos();
+      campoBusca.blur(); // fecha o teclado no celular
+    });
+
+    document.getElementById('busca-abrir').addEventListener('click', abrirBuscaCelular);
+    document.getElementById('busca-fechar').addEventListener('click', function () {
+      limparBusca();
+      fecharBuscaCelular();
+    });
+
+    infoBusca.addEventListener('click', function (e) {
+      if (e.target.closest('[data-limpar-busca]')) {
+        limparBusca();
+        fecharBuscaCelular();
+      }
+    });
+  }
 
   renderizarCategorias();
   renderizarProdutos();
@@ -207,6 +363,8 @@
       var qtd = qtdNoCarrinho(id);
       var campo = card.querySelector('.qty__input');
       var botao = card.querySelector('[data-add]');
+      if (card.classList.contains('is-esgotado')) return;
+      var mais = card.querySelector('[data-qtd="1"]');
       var noCarrinho = qtd > 0;
       card.classList.toggle('is-in-cart', noCarrinho);
       if (noCarrinho && document.activeElement !== campo) campo.value = qtd;
@@ -214,36 +372,149 @@
       card.setAttribute('data-estava', noCarrinho ? '1' : '0');
       botao.lastChild.textContent = noCarrinho ? ' No carrinho' : ' Adicionar';
       botao.setAttribute('aria-label', noCarrinho ? 'Ver carrinho' : 'Adicionar ao carrinho');
+      if (mais) mais.disabled = Number(campo.value) >= maxDe(id);
     });
   }
 
   listaProdutos.addEventListener('click', function (e) {
     var card = e.target.closest('.lp-card');
     if (!card) return;
+    var foto = e.target.closest('[data-ampliar]');
+    if (foto) { abrirGaleria(card.getAttribute('data-id')); return; }
+    if (card.classList.contains('is-esgotado')) return;
     var id = card.getAttribute('data-id');
     var campo = card.querySelector('.qty__input');
     var noCarrinho = Carrinho.qtdDe(id) > 0;
 
     var passo = e.target.closest('[data-qtd]');
     if (passo) {
-      var nova = limitarQtd(Number(campo.value) + Number(passo.getAttribute('data-qtd')));
+      var nova = limitarQtd(Number(campo.value) + Number(passo.getAttribute('data-qtd')), maxDe(id));
       campo.value = nova;
+      card.querySelector('[data-qtd="1"]').disabled = nova >= maxDe(id);
       if (noCarrinho) Carrinho.definir(id, nova);
       return;
     }
 
     if (e.target.closest('[data-add]')) {
       if (noCarrinho) Carrinho.abrir();
-      else Carrinho.adicionar(id, limitarQtd(campo.value));
+      else Carrinho.adicionar(id, limitarQtd(campo.value, maxDe(id)));
     }
   });
+
+  listaProdutos.addEventListener('keydown', function (e) {
+    var foto = e.target.closest && e.target.closest('[data-ampliar]');
+    if (foto && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      abrirGaleria(foto.closest('.lp-card').getAttribute('data-id'));
+    }
+  });
+
+  /* ---------------- Galeria de fotos (até 4 por produto) ---------------- */
+
+  var lightbox = null, focoAntesDaFoto = null;
+  var galeria = { fotos: [], indice: 0, nome: '' };
+
+  function montarLightbox() {
+    lightbox = document.createElement('div');
+    lightbox.className = 'lp-lightbox';
+    lightbox.hidden = true;
+    lightbox.setAttribute('role', 'dialog');
+    lightbox.setAttribute('aria-modal', 'true');
+    lightbox.innerHTML =
+      '<button type="button" class="lp-lightbox__fechar" aria-label="Fechar fotos">&times;</button>' +
+      '<figure class="lp-lightbox__fig">' +
+        '<div class="lp-lightbox__palco">' +
+          '<button type="button" class="lp-lightbox__nav lp-lightbox__nav--ant" data-nav="-1" aria-label="Foto anterior">&#8249;</button>' +
+          '<img class="lp-lightbox__img" alt="" data-produto-img />' +
+          '<button type="button" class="lp-lightbox__nav lp-lightbox__nav--prox" data-nav="1" aria-label="Próxima foto">&#8250;</button>' +
+        '</div>' +
+        '<figcaption class="lp-lightbox__legenda"><span class="lp-lightbox__nome"></span> <span class="lp-lightbox__cont"></span></figcaption>' +
+        '<div class="lp-lightbox__thumbs"></div>' +
+      '</figure>';
+    document.body.appendChild(lightbox);
+
+    lightbox.addEventListener('click', function (e) {
+      var nav = e.target.closest('[data-nav]');
+      if (nav) { irPara(galeria.indice + Number(nav.getAttribute('data-nav'))); return; }
+      var thumb = e.target.closest('[data-thumb]');
+      if (thumb) { irPara(Number(thumb.getAttribute('data-thumb'))); return; }
+      // Fecha no X ou tocando fora da foto
+      if (e.target === lightbox || e.target.closest('.lp-lightbox__fechar') ||
+          e.target.classList.contains('lp-lightbox__fig') || e.target.classList.contains('lp-lightbox__palco')) {
+        fecharFoto();
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (!lightbox || lightbox.hidden) return;
+      if (e.key === 'Escape') fecharFoto();
+      if (e.key === 'ArrowLeft') irPara(galeria.indice - 1);
+      if (e.key === 'ArrowRight') irPara(galeria.indice + 1);
+    });
+
+    // Arrastar com o dedo para passar as fotos
+    var inicioX = null;
+    lightbox.addEventListener('touchstart', function (e) { inicioX = e.touches[0].clientX; }, { passive: true });
+    lightbox.addEventListener('touchend', function (e) {
+      if (inicioX == null) return;
+      var dx = e.changedTouches[0].clientX - inicioX;
+      inicioX = null;
+      if (Math.abs(dx) > 40) irPara(galeria.indice + (dx < 0 ? 1 : -1));
+    });
+  }
+
+  function irPara(i) {
+    var total = galeria.fotos.length;
+    if (!total) return;
+    galeria.indice = (i + total) % total; // da última volta para a primeira
+    var img = lightbox.querySelector('.lp-lightbox__img');
+    img.src = galeria.fotos[galeria.indice];
+    img.alt = galeria.nome + (total > 1 ? ' — foto ' + (galeria.indice + 1) + ' de ' + total : '');
+    img.classList.remove('is-trocando');
+    void img.offsetWidth; // reinicia a animação
+    img.classList.add('is-trocando');
+    lightbox.querySelector('.lp-lightbox__cont').textContent = total > 1 ? (galeria.indice + 1) + ' / ' + total : '';
+    lightbox.querySelectorAll('[data-thumb]').forEach(function (t, k) {
+      t.classList.toggle('is-ativa', k === galeria.indice);
+      t.setAttribute('aria-current', k === galeria.indice ? 'true' : 'false');
+    });
+  }
+
+  function fecharFoto() {
+    if (!lightbox || lightbox.hidden) return;
+    lightbox.hidden = true;
+    document.documentElement.classList.remove('lp-sem-rolagem');
+    if (focoAntesDaFoto) focoAntesDaFoto.focus();
+  }
+
+  function abrirGaleria(id) {
+    var p = produtoPorId(id);
+    if (!p) return;
+    if (!lightbox) montarLightbox();
+    galeria = { fotos: fotosDe(p), indice: 0, nome: p.nome };
+    var varias = galeria.fotos.length > 1;
+    lightbox.classList.toggle('is-varias', varias);
+    lightbox.querySelector('.lp-lightbox__nome').textContent = p.nome;
+    lightbox.querySelector('.lp-lightbox__thumbs').innerHTML = varias
+      ? galeria.fotos.map(function (url, k) {
+          return '<button type="button" class="lp-lightbox__thumb" data-thumb="' + k + '" aria-label="Foto ' + (k + 1) + '">' +
+            '<img src="' + escapar(url) + '" alt="" data-produto-img /></button>';
+        }).join('')
+      : '';
+    lightbox.setAttribute('aria-label', 'Fotos de ' + p.nome);
+    focoAntesDaFoto = document.activeElement;
+    lightbox.hidden = false;
+    document.documentElement.classList.add('lp-sem-rolagem');
+    irPara(0);
+    lightbox.querySelector('.lp-lightbox__fechar').focus();
+  }
 
   // Número digitado no card
   listaProdutos.addEventListener('change', function (e) {
     if (!e.target.classList.contains('qty__input')) return;
     var campo = e.target;
-    campo.value = limitarQtd(campo.value);
     var id = campo.closest('.lp-card').getAttribute('data-id');
+    campo.value = limitarQtd(campo.value, maxDe(id));
     if (Carrinho.qtdDe(id) > 0) Carrinho.definir(id, campo.value);
   });
 
@@ -291,15 +562,14 @@
           '<img class="cart-item__img" src="' + escapar(imagemDe(p)) + '" alt="" data-produto-img />' +
           '<div class="cart-item__info">' +
             '<div class="cart-item__name">' + escapar(p.nome) + '</div>' +
-            '<div class="cart-item__unit">' + formatarPreco(p.preco) + ' cada</div>' +
+            '<div class="cart-item__unit">' + formatarPreco(p.preco) + ' cada' +
+              (p.preco_de ? ' <s class="cart-item__de">' + formatarPreco(p.preco_de) + '</s>' : '') + '</div>' +
             '<div class="cart-item__row">' +
-              seletorQtd(i.qtd, 'Quantidade de ' + p.nome) +
+              seletorQtd(i.qtd, 'Quantidade de ' + p.nome, maxDe(p.id)) +
               '<strong class="cart-item__sub">' + formatarPreco(p.preco * i.qtd) + '</strong>' +
             '</div>' +
           '</div>' +
-          '<button type="button" class="cart-item__remove" data-remover aria-label="Remover ' + escapar(p.nome) + '">' +
-            '<svg width="18" height="18" aria-hidden="true"><use href="#i-trash" /></svg>' +
-          '</button>' +
+          '<button type="button" class="cart-item__remove" data-remover aria-label="Remover ' + escapar(p.nome) + ' do carrinho">Remover</button>' +
         '</li>'
       );
     }
@@ -338,7 +608,7 @@
       var t = totais();
       var linhas = itens.map(function (i) {
         var p = produtoPorId(i.id);
-        return '• ' + i.qtd + 'x ' + p.nome + ' — ' + formatarPreco(p.preco * i.qtd);
+        return '• ' + i.qtd + 'x ' + p.nome + ' — ' + formatarPreco(p.preco * i.qtd) + (p.preco_de ? ' (promoção)' : '');
       });
       return 'Olá, VTT Store! Quero fazer este pedido pelo site:\n\n' +
         '*Pedido:* ' + pedidoId + '\n\n' +
@@ -387,7 +657,7 @@
 
     function mudarQtd(id, qtd) {
       var item = itens.find(function (i) { return i.id === id; });
-      if (item) item.qtd = limitarQtd(qtd);
+      if (item) item.qtd = limitarQtd(qtd, maxDe(id));
       salvar();
       renderizar();
     }
@@ -412,7 +682,7 @@
       if (passo) {
         var item = itens.find(function (i) { return i.id === id; });
         var nova = item.qtd + Number(passo.getAttribute('data-qtd'));
-        if (nova < 1) return;
+        if (nova < 1 || nova > maxDe(id)) return;
         mudarQtd(id, nova);
         var botao = lista.querySelector('.cart-item[data-id="' + id + '"] [data-qtd="' + passo.getAttribute('data-qtd') + '"]');
         if (botao) botao.focus();
@@ -488,16 +758,25 @@
     return {
       // Catálogo novo chegou do Gestor: tira do carrinho o que saiu do site e recalcula preços
       atualizarCatalogo: function () {
-        itens = itens.filter(function (i) { return produtoPorId(i.id); });
+        var avisos = [];
+        itens = itens.filter(function (i) {
+          var p = produtoPorId(i.id);
+          if (!p) return false;
+          var max = maxDe(i.id);
+          if (max < 1) { avisos.push(p.nome + ' esgotou e saiu do carrinho'); return false; }
+          if (i.qtd > max) { i.qtd = max; avisos.push(p.nome + ': só restam ' + max); }
+          return true;
+        });
         salvar();
         renderizar();
+        if (avisos.length) avisar(avisos.join(' · '));
       },
       qtdDe: qtdDe,
       abrir: abrir,
       definir: mudarQtd,
       adicionar: function (id, qtd) {
         var item = itens.find(function (i) { return i.id === id; });
-        if (item) item.qtd = limitarQtd(item.qtd + qtd);
+        if (item) item.qtd = limitarQtd(item.qtd + qtd, maxDe(id));
         else itens.push({ id: id, qtd: qtd });
         salvar();
         renderizar();
@@ -542,9 +821,10 @@
 
   /* ---------------- Catálogo do Gestor VTT ---------------- */
 
-  function aplicarCatalogo(produtos, categorias) {
+  function aplicarCatalogo(produtos, categorias, promocao) {
     PRODUTOS = prepararProdutos(produtos);
     CATEGORIAS = categorias;
+    CATEGORIA_PROMO = promocao || null;
     if (categoriaAtiva !== 'Todos' && CATEGORIAS.indexOf(categoriaAtiva) < 0) categoriaAtiva = 'Todos';
     atualizarPrecoMinimo();
     renderizarCategorias();
@@ -562,15 +842,31 @@
           console.info('[VTT] Nenhum produto ativo no Gestor ainda. Mostrando o js/produtos.js.');
           return;
         }
-        gravarJSON(STORAGE_CATALOGO, { produtos: r.produtos, categorias: r.categorias });
-        aplicarCatalogo(r.produtos, r.categorias);
+        // Só redesenha a vitrine quando algo mudou (preço, estoque, produto...)
+        var assinatura = JSON.stringify(r);
+        if (assinatura === ultimoCatalogo) return;
+        ultimoCatalogo = assinatura;
+        gravarJSON(STORAGE_CATALOGO, { produtos: r.produtos, categorias: r.categorias, promocao: r.promocao || null });
+        aplicarCatalogo(r.produtos, r.categorias, r.promocao);
       })
       .catch(function (err) {
         console.warn('[VTT] Não foi possível carregar os produtos do Gestor. Mostrando a última lista salva ou o js/produtos.js.', err);
       });
   }
 
+  var ultimoCatalogo = null;
+  var SEGUNDOS_ATUALIZAR_ESTOQUE = 30;
+
   carregarCatalogo();
+
+  // Estoque e preços sempre atualizados: busca de novo a cada 30 s (com a aba aberta)
+  // e na hora em que a pessoa volta para a aba do site.
+  setInterval(function () {
+    if (!document.hidden) carregarCatalogo();
+  }, SEGUNDOS_ATUALIZAR_ESTOQUE * 1000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) carregarCatalogo();
+  });
 
   // Aviso rápido no rodapé da tela
   var toast = document.getElementById('toast');

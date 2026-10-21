@@ -1350,3 +1350,437 @@ body.cart-aberto {
 @media (max-width: 400px) {
   .lp-top__name { display: none; }
 }
+
+/* ==========================================================
+   Gestor VTT — foto ampliada, estoque e promoção
+   ========================================================== */
+
+html.lp-sem-rolagem {
+  overflow: hidden;
+}
+
+/* ---------- Foto do produto: clique para ampliar ---------- */
+
+.lp-card__media img[data-ampliar] {
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+}
+
+.lp-card__media img[data-ampliar]:hover {
+  transform: scale(1.04);
+}
+
+.lp-card__media img[data-ampliar]:focus-visible {
+  outline: 2px solid var(--venom);
+  outline-offset: -2px;
+}
+
+.lp-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 16px 24px;
+  background: rgba(7, 8, 10, 0.92);
+  animation: lp-lightbox-entra 0.2s ease-out;
+}
+
+.lp-lightbox[hidden] {
+  display: none;
+}
+
+.lp-lightbox__fig {
+  margin: 0;
+  width: min(960px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: zoom-out;
+}
+
+.lp-lightbox__img {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100vh - 140px);
+  max-height: calc(100dvh - 140px);
+  object-fit: contain;
+  background: #e4e3e2;
+  cursor: default;
+  animation: lp-lightbox-salta 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.lp-lightbox__legenda {
+  color: var(--bone);
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+}
+
+.lp-lightbox__fechar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  background: var(--ink-950);
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lp-lightbox__fechar:hover {
+  border-color: var(--venom);
+}
+
+@keyframes lp-lightbox-entra {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes lp-lightbox-salta {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-lightbox,
+  .lp-lightbox__img {
+    animation: none;
+  }
+  .lp-card__media img[data-ampliar]:hover {
+    transform: none;
+  }
+}
+
+/* ---------- Estoque no card ---------- */
+
+.lp-card__estoque {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bone-dim);
+}
+
+.lp-card__estoque.is-pouco {
+  color: #ffc53d;
+}
+
+.lp-card__estoque.is-zero {
+  color: var(--danger);
+}
+
+.lp-card.is-esgotado .lp-card__media img {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.lp-card.is-esgotado .lp-card__add,
+.lp-card.is-esgotado .qty {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qty__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---------- Promoção ---------- */
+
+.lp-card__de {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bone-dim);
+  text-decoration: line-through;
+}
+
+.lp-card__off {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 9px;
+}
+
+.category-chip.is-promo {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.category-chip.is-promo.active {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.cart-item__de {
+  color: var(--bone-dim);
+}
+
+/* ---------- Carrinho: botão "Remover" em texto ---------- */
+
+.cart-item__remove {
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---------- Galeria (até 4 fotos) ---------- */
+
+.lp-card__fotos {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(7, 8, 10, 0.8);
+  color: var(--bone);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 7px;
+  pointer-events: none;
+}
+
+.lp-lightbox__palco {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-lightbox__img.is-trocando {
+  animation: lp-lightbox-salta 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.lp-lightbox__nav {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 56px;
+  background: rgba(7, 8, 10, 0.75);
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lp-lightbox__nav:hover {
+  border-color: var(--venom);
+  color: var(--venom);
+}
+
+.lp-lightbox__nav--ant { left: 8px; }
+.lp-lightbox__nav--prox { right: 8px; }
+
+.lp-lightbox.is-varias .lp-lightbox__nav {
+  display: block;
+}
+
+.lp-lightbox__cont {
+  color: var(--bone-dim);
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.lp-lightbox__thumbs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.lp-lightbox__thumbs:empty {
+  display: none;
+}
+
+.lp-lightbox__thumb {
+  width: 64px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid transparent;
+  background: #e4e3e2;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.lp-lightbox__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.lp-lightbox__thumb.is-ativa,
+.lp-lightbox__thumb:hover {
+  border-color: var(--venom);
+  opacity: 1;
+}
+
+.lp-lightbox.is-varias .lp-lightbox__img {
+  max-height: calc(100vh - 210px);
+  max-height: calc(100dvh - 210px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-lightbox__img.is-trocando {
+    animation: none;
+  }
+}
+
+/* ---------- Busca de produtos no topo ---------- */
+
+.lp-top__bar {
+  position: relative;
+}
+
+.lp-busca {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 280px;
+  min-width: 0;
+}
+
+.lp-busca__icone {
+  position: absolute;
+  left: 12px;
+  color: var(--bone-dim);
+  pointer-events: none;
+}
+
+.lp-busca__campo {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 38px;
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font: inherit;
+  font-size: 14px;
+}
+
+.lp-busca__campo::placeholder {
+  color: var(--bone-dim);
+}
+
+.lp-busca__campo:focus {
+  outline: none;
+  border-color: var(--venom);
+}
+
+/* tira o "x" padrão do navegador; usamos o "Limpar busca" */
+.lp-busca__campo::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.lp-busca__fechar,
+.lp-top__busca-btn {
+  display: none;
+}
+
+.lp-busca-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-900);
+  font-size: 14px;
+  color: var(--bone-dim);
+}
+
+.lp-busca-info[hidden] {
+  display: none;
+}
+
+.lp-busca-info strong {
+  color: var(--venom);
+}
+
+.lp-busca-info__limpar {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--bone);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.lp-busca-info__limpar:hover {
+  color: var(--venom);
+}
+
+/* Celular: só a lupa no topo; ao tocar, a busca ocupa a barra inteira */
+@media (max-width: 640px) {
+  .lp-top__busca-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    padding: 8px 10px;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--bone);
+  }
+
+  .lp-top__cart {
+    margin-left: 0;
+  }
+
+  .lp-busca {
+    display: none;
+  }
+
+  .lp-top.is-buscando .lp-busca {
+    display: flex;
+    position: absolute;
+    inset: 0 16px;
+    z-index: 5;
+    background: var(--ink-950);
+    gap: 8px;
+  }
+
+  .lp-top.is-buscando .lp-busca__fechar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 40px;
+    height: 40px;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--bone);
+  }
+
+  .lp-busca__campo {
+    font-size: 16px; /* evita o zoom automático no iPhone */
+  }
+}
