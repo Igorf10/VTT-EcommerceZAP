@@ -9,7 +9,7 @@ window.VTT_CONFIG = {
 
   // Cadastro de 10% OFF (Leads) — continua no Google Apps Script + planilha (termina em /exec).
   // Enquanto estiver vazia, o cadastro é só simulado e aparece no console (F12).
-  leadsUrl: 'https://script.google.com/macros/s/AKfycbyCMLCClUloXW-evdEigfkldmKqHp9oiPE3H7x_pWFJVA58z4uUIgATMyruv7A4nWF_Sw/exec',
+  leadsUrl: 'https://script.google.com/macros/s/AKfycbyYh0gGfIpvCoVhTN5TfkyHiuf0kxEDViEwI0VE0s4udFxlhOuoMBEBAJm4WBD0sZNl3A/exec',
 
   // Gestor VTT no Supabase: produtos da vitrine e registro dos pedidos.
   // A publishable key pode ficar pública. NUNCA coloque aqui a secret key (sb_secret_...).

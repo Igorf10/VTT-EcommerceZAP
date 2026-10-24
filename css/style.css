@@ -1784,3 +1784,298 @@ html.lp-sem-rolagem {
     font-size: 16px; /* evita o zoom automático no iPhone */
   }
 }
+
+/* ---------- Tamanho e cor no card ---------- */
+
+.lp-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lp-opcao__rot {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bone-dim);
+}
+
+.lp-opcao__rot strong {
+  color: var(--bone);
+}
+
+.lp-opcao__lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lp-chip {
+  min-width: 40px;
+  min-height: 36px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.lp-chip:hover:not(:disabled) {
+  border-color: var(--bone-dim);
+}
+
+.lp-chip.is-on {
+  border-color: var(--venom);
+  color: var(--venom);
+  box-shadow: inset 0 0 0 1px var(--venom);
+}
+
+.lp-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lp-opcao.is-faltando .lp-chip {
+  border-color: var(--danger);
+}
+
+.lp-opcoes__erro {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.lp-card__nocarrinho {
+  margin: 0;
+  font-size: 13px;
+  color: var(--venom);
+}
+
+.lp-card__vercarrinho {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--bone);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.cart-item__var {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--venom);
+}
+
+/* ---------- Ajustes: descrição, escolhas no Adicionar e carrinho ---------- */
+
+/* Texto longo (ou sem espaços) quebra dentro do card e fica em até 3 linhas */
+.lp-card__name,
+.lp-card__desc {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.lp-card__desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Tamanho e cor só aparecem depois do "Adicionar" */
+.lp-opcoes[hidden] {
+  display: none;
+}
+
+.lp-card.is-escolhendo .lp-opcoes {
+  padding: 12px;
+  border: 1px solid var(--venom);
+  background: var(--ink-950);
+  animation: lp-opcoes-abre 0.2s ease-out;
+}
+
+.lp-opcoes__cancelar {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--bone-dim);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.lp-opcoes__cancelar:hover {
+  color: var(--bone);
+}
+
+@keyframes lp-opcoes-abre {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-card.is-escolhendo .lp-opcoes { animation: none; }
+}
+
+/* Carrinho: trocar tamanho e cor */
+.cart-item__opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.cart-item__sel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bone-dim);
+}
+
+.cart-item__sel select {
+  min-width: 84px;
+  height: 32px;
+  padding: 0 28px 0 8px;
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cart-item__sel select:focus {
+  outline: none;
+  border-color: var(--venom);
+}
+
+/* A seção de produtos usa ".section container": o padding da .section apagava
+   a margem lateral do container, e títulos/cards encostavam na borda da tela */
+.section.container {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+@media (max-width: 640px) {
+  .section.container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* Botão "Adicionar/Confirmar" nunca passa da largura do card */
+.lp-card__buy {
+  min-width: 0;
+}
+
+.lp-card__buy .lp-card__add {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+  white-space: nowrap;
+}
+
+/* ---------- Janela de cadastro (aberta pelo carrinho) ---------- */
+
+.lp-dlg-cadastro {
+  width: min(460px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 16px 0 0; /* espaço para o selo "10% OFF", que fica acima da caixa */
+  border: 0;
+  background: transparent;
+  overflow: auto;
+}
+
+.lp-dlg-cadastro::backdrop {
+  background: rgba(7, 8, 10, 0.85);
+}
+
+.lp-dlg-cadastro[open] {
+  animation: lp-cadastro-entra 0.2s ease-out;
+}
+
+.lp-dlg-cadastro__conteudo .lp-form {
+  margin: 0;
+}
+
+.lp-dlg-cadastro__fechar {
+  position: absolute;
+  top: 24px;
+  right: 8px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  background: var(--ink-950);
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lp-dlg-cadastro__fechar:hover {
+  border-color: var(--venom);
+}
+
+#btn-aplicar-cupom {
+  width: 100%;
+}
+
+@keyframes lp-cadastro-entra {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-dlg-cadastro[open] { animation: none; }
+}
+
+/* Aviso "copie o código" na janela de cadastro */
+.lp-aviso-copiar {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  background: rgba(255, 92, 61, 0.1);
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lp-aviso-copiar.is-tremendo {
+  animation: lp-tremer 0.4s ease;
+}
+
+#btn-copiar-cupom.is-chamando {
+  box-shadow: 0 0 0 3px rgba(182, 255, 60, 0.45);
+}
+
+@keyframes lp-tremer {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-aviso-copiar.is-tremendo { animation: none; }
+}

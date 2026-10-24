@@ -136,7 +136,12 @@
 
   var barraCategorias = document.getElementById('categorias');
   var listaProdutos = document.getElementById('lista-produtos');
-  var categoriaAtiva = 'Todos';
+  // Sem "Todos": a vitrine abre na categoria Promoção (ou na 1ª categoria, se não houver promoção)
+  function categoriaPadrao() {
+    if (CATEGORIA_PROMO && CATEGORIAS.indexOf(CATEGORIA_PROMO) >= 0) return CATEGORIA_PROMO;
+    return CATEGORIAS[0] || '';
+  }
+  var categoriaAtiva = categoriaPadrao();
   var termoBusca = '';   // texto da barra de busca do topo
 
   // Minúsculas e sem acento: "Calça" encontra "calca" e vice-versa
@@ -172,12 +177,14 @@
           '<p class="lp-card__desc">' + escapar(p.descricao) + '</p>' +
           '<div class="lp-card__price">' + precoHtml(p) + '</div>' +
           textoEstoque(p) +
+          opcoesHtml(p, esgotado) +
           '<div class="lp-card__buy">' +
             seletorQtd(1, 'Quantidade de ' + p.nome, maxDe(p.id), esgotado) +
             '<button type="button" class="btn btn-primary lp-card__add" data-add="' + escapar(p.id) + '"' + (esgotado ? ' disabled' : '') + '>' +
               '<svg width="18" height="18" aria-hidden="true"><use href="#i-cart" /></svg>' + (esgotado ? ' Esgotado' : ' Adicionar') +
             '</button>' +
           '</div>' +
+          '<p class="lp-card__nocarrinho" hidden></p>' +
         '</div>' +
       '</article>'
     );
@@ -222,6 +229,53 @@
     return '<p class="lp-card__estoque">' + e + ' em estoque</p>';
   }
 
+  // Tamanho e cor escolhidos em cada card: { P001: { tamanho: 'M', cor: 'Verde' } }
+  var selecoes = {};
+
+  function opcoesDe(p) {
+    return {
+      tamanhos: p && Array.isArray(p.tamanhos) ? p.tamanhos : [],
+      cores: p && Array.isArray(p.cores) ? p.cores : [],
+    };
+  }
+
+  function selecaoDe(p) {
+    var o = opcoesDe(p);
+    var s = selecoes[p.id] || {};
+    // Só uma opção disponível: já vem marcada
+    if (!s.tamanho && o.tamanhos.length === 1) s.tamanho = o.tamanhos[0];
+    if (!s.cor && o.cores.length === 1) s.cor = o.cores[0];
+    // Opção que saiu do produto (mudou no Gestor): desmarca
+    if (s.tamanho && o.tamanhos.indexOf(s.tamanho) < 0) s.tamanho = '';
+    if (s.cor && o.cores.indexOf(s.cor) < 0) s.cor = '';
+    selecoes[p.id] = s;
+    return s;
+  }
+
+  function grupoOpcoes(p, tipo, rotulo, valores, escolhido, desligado) {
+    if (!valores.length) return '';
+    return '<div class="lp-opcao" role="group" aria-label="' + rotulo + '">' +
+      '<span class="lp-opcao__rot">' + rotulo + (escolhido ? ': <strong>' + escapar(escolhido) + '</strong>' : '') + '</span>' +
+      '<div class="lp-opcao__lista">' + valores.map(function (v) {
+        var on = v === escolhido;
+        return '<button type="button" class="lp-chip' + (on ? ' is-on' : '') + '" data-opcao="' + tipo + '" data-valor="' + escapar(v) + '"' +
+          ' aria-pressed="' + on + '"' + (desligado ? ' disabled' : '') + '>' + escapar(v) + '</button>';
+      }).join('') + '</div>' +
+    '</div>';
+  }
+
+  function opcoesHtml(p, desligado) {
+    var o = opcoesDe(p);
+    if (!o.tamanhos.length && !o.cores.length) return '';
+    var s = selecaoDe(p);
+    return '<div class="lp-opcoes" hidden>' +
+      grupoOpcoes(p, 'tamanho', 'Tamanho', o.tamanhos, s.tamanho, desligado) +
+      grupoOpcoes(p, 'cor', 'Cor', o.cores, s.cor, desligado) +
+      '<p class="lp-opcoes__erro" role="alert" hidden></p>' +
+      '<button type="button" class="lp-opcoes__cancelar" data-cancelar-opcoes>Cancelar</button>' +
+    '</div>';
+  }
+
   function precoHtml(p) {
     if (!p.preco_de) return formatarPreco(p.preco);
     return '<span class="lp-card__de">De ' + formatarPreco(p.preco_de) + '</span> Por ' + formatarPreco(p.preco);
@@ -234,8 +288,6 @@
   function renderizarProdutos() {
     var visiveis = termoBusca
       ? PRODUTOS.filter(function (p) { return combinaComBusca(p, termoBusca); })
-      : categoriaAtiva === 'Todos'
-      ? PRODUTOS
       : categoriaAtiva === CATEGORIA_PROMO
         ? PRODUTOS.filter(function (p) { return !!p.preco_de; })
         : PRODUTOS.filter(function (p) { return p.categoria === categoriaAtiva; });
@@ -245,7 +297,7 @@
   }
 
   function renderizarCategorias() {
-    barraCategorias.innerHTML = ['Todos'].concat(CATEGORIAS).map(function (cat) {
+    barraCategorias.innerHTML = CATEGORIAS.map(function (cat) {
       var ativa = !termoBusca && cat === categoriaAtiva;
       return '<button type="button" role="tab" class="category-chip' + (ativa ? ' active' : '') + (cat === CATEGORIA_PROMO ? ' is-promo' : '') +
         '" aria-selected="' + ativa + '" data-categoria="' + escapar(cat) + '">' + escapar(cat) + '</button>';
@@ -359,21 +411,34 @@
 
   function sincronizarCards(qtdNoCarrinho) {
     listaProdutos.querySelectorAll('.lp-card').forEach(function (card) {
+      if (card.classList.contains('is-esgotado')) return;
       var id = card.getAttribute('data-id');
-      var qtd = qtdNoCarrinho(id);
+      var noCarrinho = qtdNoCarrinho(id);
+      var resta = Math.max(0, maxDe(id) - noCarrinho);
       var campo = card.querySelector('.qty__input');
       var botao = card.querySelector('[data-add]');
-      if (card.classList.contains('is-esgotado')) return;
+      var aviso = card.querySelector('.lp-card__nocarrinho');
+
+      card.classList.toggle('is-in-cart', noCarrinho > 0);
+      if (aviso) {
+        aviso.innerHTML = noCarrinho
+          ? '✓ ' + noCarrinho + (noCarrinho === 1 ? ' no carrinho' : ' no carrinho') + ' · <button type="button" class="lp-card__vercarrinho" data-cart-open-card>Ver carrinho</button>'
+          : '';
+        aviso.hidden = !noCarrinho;
+      }
+      // Já tem no carrinho tudo o que há em estoque
+      botao.disabled = resta < 1;
+      botao.lastChild.textContent = resta < 1 ? ' Limite do estoque' : (card.classList.contains('is-escolhendo') ? ' Confirmar' : ' Adicionar');
+      if (resta >= 1 && Number(campo.value) > resta) campo.value = resta;
+      campo.max = Math.max(1, resta);
       var mais = card.querySelector('[data-qtd="1"]');
-      var noCarrinho = qtd > 0;
-      card.classList.toggle('is-in-cart', noCarrinho);
-      if (noCarrinho && document.activeElement !== campo) campo.value = qtd;
-      if (!noCarrinho && card.getAttribute('data-estava') === '1') campo.value = 1;
-      card.setAttribute('data-estava', noCarrinho ? '1' : '0');
-      botao.lastChild.textContent = noCarrinho ? ' No carrinho' : ' Adicionar';
-      botao.setAttribute('aria-label', noCarrinho ? 'Ver carrinho' : 'Adicionar ao carrinho');
-      if (mais) mais.disabled = Number(campo.value) >= maxDe(id);
+      if (mais) mais.disabled = Number(campo.value) >= resta;
     });
+  }
+
+  // Quanto ainda dá para adicionar de um produto (estoque menos o que já está no carrinho)
+  function restaDe(id) {
+    return Math.max(0, maxDe(id) - Carrinho.qtdDe(id));
   }
 
   listaProdutos.addEventListener('click', function (e) {
@@ -384,22 +449,90 @@
     if (card.classList.contains('is-esgotado')) return;
     var id = card.getAttribute('data-id');
     var campo = card.querySelector('.qty__input');
-    var noCarrinho = Carrinho.qtdDe(id) > 0;
 
-    var passo = e.target.closest('[data-qtd]');
-    if (passo) {
-      var nova = limitarQtd(Number(campo.value) + Number(passo.getAttribute('data-qtd')), maxDe(id));
-      campo.value = nova;
-      card.querySelector('[data-qtd="1"]').disabled = nova >= maxDe(id);
-      if (noCarrinho) Carrinho.definir(id, nova);
+    if (e.target.closest('[data-cart-open-card]')) { Carrinho.abrir(); return; }
+
+    // Escolha de tamanho/cor
+    var chip = e.target.closest('[data-opcao]');
+    if (chip) {
+      var tipo = chip.getAttribute('data-opcao');
+      var sel = selecoes[id] || (selecoes[id] = {});
+      sel[tipo] = chip.getAttribute('data-valor');
+      card.querySelectorAll('[data-opcao="' + tipo + '"]').forEach(function (c) {
+        var on = c === chip;
+        c.classList.toggle('is-on', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      var rot = chip.closest('.lp-opcao').querySelector('.lp-opcao__rot');
+      rot.innerHTML = (tipo === 'tamanho' ? 'Tamanho' : 'Cor') + ': <strong>' + escapar(sel[tipo]) + '</strong>';
+      card.querySelector('.lp-opcoes__erro').hidden = true;
+      card.querySelectorAll('.lp-opcao.is-faltando').forEach(function (g) { g.classList.remove('is-faltando'); });
       return;
     }
 
+    var passo = e.target.closest('[data-qtd]');
+    if (passo) {
+      var resta = Math.max(1, restaDe(id));
+      var nova = limitarQtd(Number(campo.value) + Number(passo.getAttribute('data-qtd')), resta);
+      campo.value = nova;
+      card.querySelector('[data-qtd="1"]').disabled = nova >= resta;
+      return;
+    }
+
+    if (e.target.closest('[data-cancelar-opcoes]')) { fecharOpcoes(card); return; }
+
     if (e.target.closest('[data-add]')) {
-      if (noCarrinho) Carrinho.abrir();
-      else Carrinho.adicionar(id, limitarQtd(campo.value, maxDe(id)));
+      var p = produtoPorId(id);
+      var o = opcoesDe(p), s2 = selecaoDe(p);
+      var painel = card.querySelector('.lp-opcoes');
+      var faltando = [];
+      if (o.tamanhos.length && !s2.tamanho) faltando.push('tamanho');
+      if (o.cores.length && !s2.cor) faltando.push('cor');
+
+      // 1º clique: mostra tamanho e cor (se o produto tiver e ainda faltar escolher, ou se o painel está fechado)
+      if (painel && painel.hidden && (faltando.length || o.tamanhos.length > 1 || o.cores.length > 1)) {
+        abrirOpcoes(card);
+        return;
+      }
+      if (faltando.length) {
+        var erro = card.querySelector('.lp-opcoes__erro');
+        erro.textContent = 'Escolha ' + faltando.join(' e ') + ' para adicionar.';
+        erro.hidden = false;
+        card.querySelectorAll('.lp-opcao').forEach(function (g) {
+          var t = g.querySelector('[data-opcao]').getAttribute('data-opcao');
+          g.classList.toggle('is-faltando', faltando.indexOf(t) >= 0);
+        });
+        return;
+      }
+      Carrinho.adicionar(id, limitarQtd(campo.value, Math.max(1, restaDe(id))), s2.tamanho || '', s2.cor || '');
+      campo.value = 1;
+      if (painel) fecharOpcoes(card);
+      sincronizarCards(Carrinho.qtdDe);
     }
   });
+
+  function abrirOpcoes(card) {
+    var painel = card.querySelector('.lp-opcoes');
+    painel.hidden = false;
+    card.classList.add('is-escolhendo');
+    var botao = card.querySelector('[data-add]');
+    botao.lastChild.textContent = ' Confirmar';
+    botao.setAttribute('aria-label', 'Confirmar e adicionar ao carrinho');
+    var primeiro = painel.querySelector('.lp-chip:not(.is-on)') || painel.querySelector('.lp-chip');
+    if (primeiro) primeiro.focus({ preventScroll: true });
+  }
+
+  function fecharOpcoes(card) {
+    var painel = card.querySelector('.lp-opcoes');
+    if (!painel) return;
+    painel.hidden = true;
+    card.classList.remove('is-escolhendo');
+    card.querySelector('.lp-opcoes__erro').hidden = true;
+    card.querySelectorAll('.lp-opcao.is-faltando').forEach(function (g) { g.classList.remove('is-faltando'); });
+    var botao = card.querySelector('[data-add]');
+    botao.setAttribute('aria-label', 'Adicionar ao carrinho');
+    sincronizarCards(Carrinho.qtdDe);
+  }
 
   listaProdutos.addEventListener('keydown', function (e) {
     var foto = e.target.closest && e.target.closest('[data-ampliar]');
@@ -514,8 +647,7 @@
     if (!e.target.classList.contains('qty__input')) return;
     var campo = e.target;
     var id = campo.closest('.lp-card').getAttribute('data-id');
-    campo.value = limitarQtd(campo.value, maxDe(id));
-    if (Carrinho.qtdDe(id) > 0) Carrinho.definir(id, campo.value);
+    campo.value = limitarQtd(campo.value, Math.max(1, restaDe(id)));
   });
 
 
@@ -523,7 +655,62 @@
 
   var Carrinho = (function () {
     var salvo = lerJSON(STORAGE_CARRINHO, {});
-    var itens = (salvo.itens || []).filter(function (i) { return produtoPorId(i.id); });
+    var itens = (salvo.itens || []).filter(function (i) { return produtoPorId(i.id); })
+      .map(function (i) { return { id: i.id, qtd: i.qtd, tamanho: i.tamanho || '', cor: i.cor || '' }; });
+
+    // Mesmo produto em tamanhos/cores diferentes = linhas diferentes no carrinho
+    function chave(i) { return i.id + '|' + (i.tamanho || '') + '|' + (i.cor || ''); }
+    function itemPorChave(k) { return itens.find(function (i) { return chave(i) === k; }); }
+    function textoVariacao(i) {
+      return [i.tamanho ? 'Tam ' + i.tamanho : '', i.cor || ''].filter(Boolean).join(' · ');
+    }
+    // Tamanho e cor editáveis dentro do carrinho
+    function seletorCarrinho(tipo, rotulo, valores, atual) {
+      if (!valores.length && !atual) return '';
+      var lista = valores.slice();
+      if (atual && lista.indexOf(atual) < 0) lista.unshift(atual); // opção que saiu do produto continua visível
+      return '<label class="cart-item__sel"><span>' + rotulo + '</span>' +
+        '<select data-trocar="' + tipo + '" aria-label="' + rotulo + '">' +
+          (atual ? '' : '<option value="" selected disabled>Escolha</option>') +
+          lista.map(function (v) {
+            return '<option value="' + escapar(v) + '"' + (v === atual ? ' selected' : '') + '>' + escapar(v) + '</option>';
+          }).join('') +
+        '</select></label>';
+    }
+
+    function opcoesCarrinho(p, i) {
+      var o = opcoesDe(p);
+      var html = seletorCarrinho('tamanho', 'Tamanho', o.tamanhos, i.tamanho) + seletorCarrinho('cor', 'Cor', o.cores, i.cor);
+      return html ? '<div class="cart-item__opcoes">' + html + '</div>' : '';
+    }
+
+    // Itens que ainda precisam de tamanho/cor (ex.: produto ganhou opções depois de ir para o carrinho)
+    function itensSemEscolha() {
+      return itens.filter(function (i) {
+        var o = opcoesDe(produtoPorId(i.id));
+        return (o.tamanhos.length && !i.tamanho) || (o.cores.length && !i.cor);
+      });
+    }
+
+    function trocarOpcao(k, tipo, valor) {
+      var item = itemPorChave(k);
+      if (!item) return;
+      item[tipo] = valor;
+      // Virou igual a outra linha do carrinho: junta as duas
+      var igual = itens.find(function (x) { return x !== item && chave(x) === chave(item); });
+      if (igual) {
+        igual.qtd += item.qtd;
+        itens = itens.filter(function (x) { return x !== item; });
+        avisar('Juntamos com o item igual que já estava no carrinho');
+      }
+      salvar();
+      renderizar();
+    }
+
+    // Máximo desta linha: estoque do produto menos o que está nas outras linhas dele
+    function maxDaLinha(i) {
+      return Math.max(0, maxDe(i.id) - (qtdDe(i.id) - i.qtd));
+    }
     var cupom = FORMATO_CUPOM.test(salvo.cupom || '') ? salvo.cupom : '';
     var pedidoId = /^VTT-\d{6}-[A-Z0-9]{4}$/.test(salvo.pedidoId || '') ? salvo.pedidoId : novoIdPedido();
 
@@ -558,14 +745,15 @@
     function linhaItem(i) {
       var p = produtoPorId(i.id);
       return (
-        '<li class="cart-item" data-id="' + escapar(p.id) + '">' +
+        '<li class="cart-item" data-id="' + escapar(p.id) + '" data-chave="' + escapar(chave(i)) + '">' +
           '<img class="cart-item__img" src="' + escapar(imagemDe(p)) + '" alt="" data-produto-img />' +
           '<div class="cart-item__info">' +
             '<div class="cart-item__name">' + escapar(p.nome) + '</div>' +
+            opcoesCarrinho(p, i) +
             '<div class="cart-item__unit">' + formatarPreco(p.preco) + ' cada' +
               (p.preco_de ? ' <s class="cart-item__de">' + formatarPreco(p.preco_de) + '</s>' : '') + '</div>' +
             '<div class="cart-item__row">' +
-              seletorQtd(i.qtd, 'Quantidade de ' + p.nome, maxDe(p.id)) +
+              seletorQtd(i.qtd, 'Quantidade de ' + p.nome, maxDaLinha(i)) +
               '<strong class="cart-item__sub">' + formatarPreco(p.preco * i.qtd) + '</strong>' +
             '</div>' +
           '</div>' +
@@ -574,9 +762,9 @@
       );
     }
 
+    // Total do produto no carrinho (somando todos os tamanhos e cores)
     function qtdDe(id) {
-      var item = itens.find(function (i) { return i.id === id; });
-      return item ? item.qtd : 0;
+      return itens.reduce(function (s, i) { return i.id === id ? s + i.qtd : s; }, 0);
     }
 
     function renderizar() {
@@ -608,7 +796,8 @@
       var t = totais();
       var linhas = itens.map(function (i) {
         var p = produtoPorId(i.id);
-        return '• ' + i.qtd + 'x ' + p.nome + ' — ' + formatarPreco(p.preco * i.qtd) + (p.preco_de ? ' (promoção)' : '');
+        var v = [i.tamanho ? 'Tam ' + i.tamanho : '', i.cor || ''].filter(Boolean).join(', ');
+        return '• ' + i.qtd + 'x ' + p.nome + (v ? ' (' + v + ')' : '') + ' — ' + formatarPreco(p.preco * i.qtd) + (p.preco_de ? ' (promoção)' : '');
       });
       return 'Olá, VTT Store! Quero fazer este pedido pelo site:\n\n' +
         '*Pedido:* ' + pedidoId + '\n\n' +
@@ -616,7 +805,7 @@
         'Subtotal: ' + formatarPreco(t.subtotal) + '\n' +
         (cupom ? 'Cupom ' + cupom + ' (' + Math.round(DESCONTO * 100) + '% OFF): − ' + formatarPreco(t.desconto) + '\n' : '') +
         '*Total: ' + formatarPreco(t.total) + '*\n\n' +
-        'Pode me passar os tamanhos e cores disponíveis?';
+        'Como faço o pagamento e a entrega/retirada?';
     }
 
     function mensagemCupom(texto, tipo) {
@@ -632,14 +821,41 @@
       if (!FORMATO_CUPOM.test(codigo)) {
         return mensagemCupom('Código inválido. Confira se colou o código completo, ex.: VTT10-AB3K9.', 'erro');
       }
-      cupom = codigo;
-      campoCupom.value = '';
-      mensagemCupom('');
-      salvar();
-      renderizar();
+      var botao = document.getElementById('cart-cupom-aplicar');
+      botao.disabled = true;
+      mensagemCupom('Conferindo o cupom…');
+      // O cupom vale uma vez só (primeira compra após o cadastro): confere antes de dar o desconto
+      validarCupom(codigo)
+        .then(function (r) {
+          if (!r.ok) return mensagemCupom(r.mensagem, 'erro');
+          cupom = codigo;
+          campoCupom.value = '';
+          mensagemCupom('');
+          salvar();
+          renderizar();
+        })
+        .catch(function (err) {
+          console.error('[VTT] Não foi possível conferir o cupom:', err);
+          mensagemCupom('Não foi possível conferir o cupom agora. Confira sua internet e tente de novo.', 'erro');
+        })
+        .finally(function () { botao.disabled = false; });
+    }
+
+    // Cupom que já estava no carrinho: confere de novo (pode ter sido usado em outra compra)
+    function reconferirCupom() {
+      if (!cupom) return;
+      var codigo = cupom;
+      validarCupom(codigo).then(function (r) {
+        if (r.ok || cupom !== codigo) return;
+        cupom = '';
+        salvar();
+        renderizar();
+        mensagemCupom(r.mensagem + ' O desconto foi retirado do carrinho.', 'erro');
+      }).catch(function () { /* sem internet: confere na próxima vez */ });
     }
 
     function abrir() {
+      reconferirCupom();
       ultimoFoco = document.activeElement;
       fundo.hidden = false;
       painel.hidden = false;
@@ -655,9 +871,9 @@
       if (ultimoFoco && ultimoFoco.focus) ultimoFoco.focus({ preventScroll: true });
     }
 
-    function mudarQtd(id, qtd) {
-      var item = itens.find(function (i) { return i.id === id; });
-      if (item) item.qtd = limitarQtd(qtd, maxDe(id));
+    function mudarQtd(k, qtd) {
+      var item = itemPorChave(k);
+      if (item) item.qtd = limitarQtd(qtd, Math.max(1, maxDaLinha(item)));
       salvar();
       renderizar();
     }
@@ -671,25 +887,38 @@
     });
     fundo.addEventListener('click', fechar);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !painel.hidden) fechar();
+      // Com a janela de cadastro aberta, o Esc fecha só ela
+      if (e.key === 'Escape' && !painel.hidden && !document.querySelector('dialog[open]')) fechar();
     });
 
     lista.addEventListener('click', function (e) {
       var linha = e.target.closest('.cart-item');
       if (!linha) return;
-      var id = linha.getAttribute('data-id');
+      var k = linha.getAttribute('data-chave');
       var passo = e.target.closest('[data-qtd]');
       if (passo) {
-        var item = itens.find(function (i) { return i.id === id; });
+        var item = itemPorChave(k);
         var nova = item.qtd + Number(passo.getAttribute('data-qtd'));
-        if (nova < 1 || nova > maxDe(id)) return;
-        mudarQtd(id, nova);
-        var botao = lista.querySelector('.cart-item[data-id="' + id + '"] [data-qtd="' + passo.getAttribute('data-qtd') + '"]');
-        if (botao) botao.focus();
+        // "−" com 1 unidade: tira o item do carrinho (igual ao "Remover")
+        if (nova < 1) {
+          itens = itens.filter(function (i) { return chave(i) !== k; });
+          salvar();
+          renderizar();
+          avisar(produtoPorId(item.id).nome + ' saiu do carrinho');
+          return;
+        }
+        if (nova > maxDaLinha(item)) return;
+        mudarQtd(k, nova);
+        lista.querySelectorAll('.cart-item').forEach(function (li) {
+          if (li.getAttribute('data-chave') === k) {
+            var b = li.querySelector('[data-qtd="' + passo.getAttribute('data-qtd') + '"]');
+            if (b) b.focus();
+          }
+        });
         return;
       }
       if (e.target.closest('[data-remover]')) {
-        itens = itens.filter(function (i) { return i.id !== id; });
+        itens = itens.filter(function (i) { return chave(i) !== k; });
         salvar();
         renderizar();
         document.getElementById('cart-fechar').focus();
@@ -697,8 +926,13 @@
     });
 
     lista.addEventListener('change', function (e) {
+      var sel = e.target.closest('[data-trocar]');
+      if (sel) {
+        trocarOpcao(sel.closest('.cart-item').getAttribute('data-chave'), sel.getAttribute('data-trocar'), sel.value);
+        return;
+      }
       if (!e.target.classList.contains('qty__input')) return;
-      mudarQtd(e.target.closest('.cart-item').getAttribute('data-id'), e.target.value);
+      mudarQtd(e.target.closest('.cart-item').getAttribute('data-chave'), e.target.value);
     });
 
     document.getElementById('cart-cupom-aplicar').addEventListener('click', aplicarCupom);
@@ -724,7 +958,7 @@
         p_id: pedidoId,
         p_itens: itens.map(function (i) {
           var p = produtoPorId(i.id);
-          return { id: p.id, produto: p.nome, qtd: i.qtd, preco: p.preco };
+          return { id: p.id, produto: p.nome, qtd: i.qtd, preco: p.preco, tamanho: i.tamanho || '', cor: i.cor || '' };
         }),
         p_cupom: cupom,
         p_desconto: totais().desconto,
@@ -739,6 +973,17 @@
 
     finalizar.addEventListener('click', function (e) {
       if (!itens.length) { e.preventDefault(); return; }
+      var pendentes = itensSemEscolha();
+      if (pendentes.length) {
+        e.preventDefault();
+        avisar('Escolha tamanho e cor de ' + produtoPorId(pendentes[0].id).nome + ' no carrinho');
+        var linha = Array.prototype.find.call(lista.querySelectorAll('.cart-item'), function (li) {
+          return li.getAttribute('data-chave') === chave(pendentes[0]);
+        });
+        var campo = linha && linha.querySelector('select option[value=""]:checked');
+        if (campo) campo.parentNode.focus();
+        return;
+      }
       enviarParaGestor();
       var enviado = pedidoId;
       // Depois que o navegador já abriu o WhatsApp com a mensagem, começa um carrinho novo
@@ -757,14 +1002,29 @@
 
     return {
       // Catálogo novo chegou do Gestor: tira do carrinho o que saiu do site e recalcula preços
+      reconferirCupom: reconferirCupom,
+      // Cupom recebido no cadastro feito pela janela do carrinho
+      aplicarCodigo: function (codigo) {
+        campoCupom.value = codigo;
+        aplicarCupom();
+      },
       atualizarCatalogo: function () {
         var avisos = [];
+        var usado = {};
         itens = itens.filter(function (i) {
           var p = produtoPorId(i.id);
           if (!p) return false;
           var max = maxDe(i.id);
-          if (max < 1) { avisos.push(p.nome + ' esgotou e saiu do carrinho'); return false; }
-          if (i.qtd > max) { i.qtd = max; avisos.push(p.nome + ': só restam ' + max); }
+          if (max < 1) {
+            if (!usado[i.id]) avisos.push(p.nome + ' esgotou e saiu do carrinho');
+            usado[i.id] = -1;
+            return false;
+          }
+          // Estoque é do produto: as linhas dele (tamanhos/cores) dividem o que tem
+          var livre = max - Math.max(0, usado[i.id] || 0);
+          if (livre < 1) { avisos.push(p.nome + ' (' + textoVariacao(i) + '): saiu, estoque acabou'); return false; }
+          if (i.qtd > livre) { i.qtd = livre; avisos.push(p.nome + ': só restam ' + max); }
+          usado[i.id] = (usado[i.id] || 0) + i.qtd;
           return true;
         });
         salvar();
@@ -774,13 +1034,18 @@
       qtdDe: qtdDe,
       abrir: abrir,
       definir: mudarQtd,
-      adicionar: function (id, qtd) {
-        var item = itens.find(function (i) { return i.id === id; });
-        if (item) item.qtd = limitarQtd(item.qtd + qtd, maxDe(id));
-        else itens.push({ id: id, qtd: qtd });
+      adicionar: function (id, qtd, tamanho, cor) {
+        var novo = { id: id, qtd: 0, tamanho: tamanho || '', cor: cor || '' };
+        var item = itemPorChave(chave(novo));
+        var livre = maxDe(id) - qtdDe(id);
+        var soma = Math.max(0, Math.min(qtd, livre));
+        if (!soma) { avisar('Você já tem no carrinho todo o estoque deste produto'); return; }
+        if (item) item.qtd += soma;
+        else { novo.qtd = soma; itens.push(novo); }
         salvar();
         renderizar();
-        avisar(produtoPorId(id).nome + ' no carrinho');
+        var v = textoVariacao(novo);
+        avisar(produtoPorId(id).nome + (v ? ' (' + v + ')' : '') + ' no carrinho');
       },
     };
   })();
@@ -825,7 +1090,7 @@
     PRODUTOS = prepararProdutos(produtos);
     CATEGORIAS = categorias;
     CATEGORIA_PROMO = promocao || null;
-    if (categoriaAtiva !== 'Todos' && CATEGORIAS.indexOf(categoriaAtiva) < 0) categoriaAtiva = 'Todos';
+    if (CATEGORIAS.indexOf(categoriaAtiva) < 0) categoriaAtiva = categoriaPadrao();
     atualizarPrecoMinimo();
     renderizarCategorias();
     renderizarProdutos();
@@ -858,6 +1123,7 @@
   var SEGUNDOS_ATUALIZAR_ESTOQUE = 30;
 
   carregarCatalogo();
+  Carrinho.reconferirCupom();
 
   // Estoque e preços sempre atualizados: busca de novo a cada 30 s (com a aba aberta)
   // e na hora em que a pessoa volta para a aba do site.
@@ -900,6 +1166,33 @@
         .then(lerResposta);
     },
   };
+
+  /* ---------- Cupom de uso único ----------
+     1) Planilha de cadastro: o cupom existe e a caixa "Cupom usado?" não está marcada.
+     2) Banco do Gestor: o cupom não está em nenhum pedido pendente ou confirmado. */
+  function validarCupom(codigo) {
+    var naPlanilha = CONFIG.leadsUrl
+      ? fetch(CONFIG.leadsUrl + '?' + new URLSearchParams({ acao: 'cupom', codigo: codigo }).toString()).then(lerResposta)
+      : Promise.resolve({ ok: true, existe: true, usado: false }); // modo teste
+    var noBanco = supabaseConfigurado()
+      ? chamarSupabase('cupom_disponivel', { p_cupom: codigo })
+      : Promise.resolve({ disponivel: true });
+
+    return Promise.all([naPlanilha, noBanco]).then(function (r) {
+      var planilha = r[0] || {}, banco = r[1] || {};
+      if (!planilha.ok) throw new Error('planilha: ' + (planilha.mensagem || 'resposta inválida'));
+      if (typeof planilha.existe === 'undefined') {
+        // API de cadastro ainda na versão antiga (sem acao=cupom): confere só no banco
+        console.warn('[VTT] A API de cadastro não tem a consulta de cupom. Atualize o Code.gs para a versão 7.');
+      } else if (!planilha.existe) {
+        return { ok: false, mensagem: 'Cupom não encontrado. Confira o código que você recebeu no cadastro.' };
+      }
+      if (planilha.usado || banco.disponivel === false) {
+        return { ok: false, mensagem: 'Este cupom já foi usado. Ele vale só para a primeira compra após o cadastro.' };
+      }
+      return { ok: true };
+    });
+  }
 
   // Lê a resposta da API e, se não vier JSON, explica o motivo no console (F12)
   function lerResposta(r) {
@@ -1004,7 +1297,139 @@
     botaoCopiar.classList.remove('is-copied');
     form.hidden = true;
     telaSucesso.hidden = false;
+    if (janelaAberta()) cupomPendente = true;
   }
+
+  /* ---------- Cadastro em janela (link "Cadastre-se e ganhe 10%" do carrinho) ---------- */
+  /* Usa o MESMO formulário da tela inicial: ele é levado para dentro da janela
+     e devolvido para o lugar quando a janela fecha. */
+
+  var blocoCadastro = document.getElementById('cadastro');
+  var janelaCadastro = null;
+  // Segurança: depois de gerar o cupom na janela, só dá para sair depois de copiar o código
+  var cupomPendente = false;
+
+  function janelaAberta() { return !!(janelaCadastro && janelaCadastro.open); }
+
+  function avisoCopiar(mostrar) {
+    var aviso = document.getElementById('aviso-copiar-cupom');
+    if (!aviso) return;
+    aviso.hidden = !mostrar;
+    botaoCopiar.classList.toggle('is-chamando', !!mostrar);
+    if (mostrar) {
+      aviso.classList.remove('is-tremendo');
+      void aviso.offsetWidth; // reinicia a animação
+      aviso.classList.add('is-tremendo');
+      botaoCopiar.focus();
+    }
+  }
+
+  // Devolve true se pode fechar; se o cupom ainda não foi copiado, avisa e segura a janela
+  function podeSairDaJanela() {
+    if (!cupomPendente) return true;
+    avisoCopiar(true);
+    return false;
+  }
+
+  function liberarJanela() {
+    cupomPendente = false;
+    avisoCopiar(false);
+  }
+
+  function montarJanelaCadastro() {
+    janelaCadastro = document.createElement('dialog');
+    janelaCadastro.className = 'lp-dlg-cadastro';
+    janelaCadastro.setAttribute('aria-label', 'Cadastro com 10% de desconto');
+    janelaCadastro.innerHTML =
+      '<button type="button" class="lp-dlg-cadastro__fechar" aria-label="Fechar">&times;</button>' +
+      '<div class="lp-dlg-cadastro__conteudo"></div>';
+    document.body.appendChild(janelaCadastro);
+
+    // Fase de captura: roda antes dos outros cliques, para segurar a janela se o cupom não foi copiado
+    janelaCadastro.addEventListener('click', function (e) {
+      var querSair = e.target === janelaCadastro || e.target.closest('.lp-dlg-cadastro__fechar') ||
+        e.target.closest('a[href^="#"]') || e.target.closest('#lead-reset');
+      if (querSair && !podeSairDaJanela()) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+
+    janelaCadastro.addEventListener('click', function (e) {
+      // Fecha no X, tocando fora da caixa ou em links internos (ex.: "Ver os produtos")
+      if (e.target === janelaCadastro || e.target.closest('.lp-dlg-cadastro__fechar')) { janelaCadastro.close(); return; }
+      var link = e.target.closest('a[href^="#"]');
+      if (link) janelaCadastro.close();
+      if (e.target.closest('[data-aplicar-cupom]')) {
+        var codigo = document.getElementById('lead-cupom').textContent.trim();
+        // Aplicar também copia o código (a pessoa fica com ele guardado)
+        copiarTexto(codigo).catch(function () {}).then(function () {
+          liberarJanela();
+          Carrinho.aplicarCodigo(codigo);
+          janelaCadastro.close();
+          avisar('Cupom aplicado no carrinho e copiado');
+        });
+      }
+    });
+
+    // Esc também respeita a regra de copiar o código
+    janelaCadastro.addEventListener('cancel', function (e) {
+      if (!podeSairDaJanela()) e.preventDefault();
+    });
+
+    // Ao fechar: devolve o formulário para a tela inicial
+    janelaCadastro.addEventListener('close', function () {
+      var conteudo = janelaCadastro.querySelector('.lp-dlg-cadastro__conteudo');
+      while (conteudo.firstChild) blocoCadastro.appendChild(conteudo.firstChild);
+      var aplicar = document.getElementById('btn-aplicar-cupom');
+      if (aplicar) aplicar.remove();
+      var aviso = document.getElementById('aviso-copiar-cupom');
+      if (aviso) aviso.remove();
+      botaoCopiar.classList.remove('is-chamando');
+      document.documentElement.classList.remove('lp-sem-rolagem');
+      var voltar = document.getElementById('cart-fechar');
+      if (voltar && !document.getElementById('cart').hidden) voltar.focus();
+    });
+  }
+
+  function abrirJanelaCadastro() {
+    if (!janelaCadastro) montarJanelaCadastro();
+    var conteudo = janelaCadastro.querySelector('.lp-dlg-cadastro__conteudo');
+    while (blocoCadastro.firstChild) conteudo.appendChild(blocoCadastro.firstChild);
+
+    // Aviso "copie o código para continuar" (fica logo abaixo do botão Copiar)
+    if (!document.getElementById('aviso-copiar-cupom')) {
+      var aviso = document.createElement('p');
+      aviso.id = 'aviso-copiar-cupom';
+      aviso.className = 'lp-aviso-copiar';
+      aviso.setAttribute('role', 'alert');
+      aviso.hidden = true;
+      aviso.textContent = 'Clique em "Copiar código" para continuar.';
+      botaoCopiar.insertAdjacentElement('beforebegin', aviso);
+    }
+
+    // Na janela, depois do cadastro, dá para aplicar o cupom direto no carrinho
+    if (!document.getElementById('btn-aplicar-cupom')) {
+      var aplicar = document.createElement('button');
+      aplicar.type = 'button';
+      aplicar.id = 'btn-aplicar-cupom';
+      aplicar.className = 'btn btn-outline';
+      aplicar.setAttribute('data-aplicar-cupom', '');
+      aplicar.textContent = 'Aplicar no carrinho';
+      botaoCopiar.insertAdjacentElement('afterend', aplicar);
+    }
+
+    janelaCadastro.showModal();
+    document.documentElement.classList.add('lp-sem-rolagem');
+    if (!form.hidden) campoEmail.focus();
+  }
+
+  document.querySelectorAll('[data-abrir-cadastro]').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      abrirJanelaCadastro();
+    });
+  });
 
   /* ---------- Botão "Copiar código" ---------- */
 
@@ -1034,8 +1459,10 @@
     copiarTexto(codigo).then(function () {
       rotulo.textContent = 'Código copiado!';
       botaoCopiar.classList.add('is-copied');
+      liberarJanela();
     }).catch(function () {
       rotulo.textContent = 'Selecione o código acima e copie';
+      liberarJanela();
     });
   });
 
