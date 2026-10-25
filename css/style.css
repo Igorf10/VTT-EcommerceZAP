@@ -2079,3 +2079,263 @@ html.lp-sem-rolagem {
 @media (prefers-reduced-motion: reduce) {
   .lp-aviso-copiar.is-tremendo { animation: none; }
 }
+
+/* ==========================================================
+   Rodapé com formas de pagamento e envio
+   ========================================================== */
+
+/* ---------- Rodapé ---------- */
+
+.lp-footer__grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr 1fr 1fr;
+  gap: 32px;
+  padding-block: 48px 32px;
+}
+
+.lp-footer__marca .brand {
+  margin-bottom: 12px;
+}
+
+.lp-footer__texto {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.lp-footer__titulo {
+  margin: 0 0 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+
+.lp-selos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Cada logo num "selo" branco, para ficar legível no fundo escuro */
+.lp-selo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  min-width: 52px;
+  padding: 6px 9px;
+  background: #ffffff;
+  border-radius: 6px;
+  color: #1b1e21;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lp-selo img {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 58px;
+  object-fit: contain;
+}
+
+.lp-selo--largo {
+  min-width: 96px;
+}
+
+.lp-selo--largo img {
+  max-width: 96px;
+  height: 20px;
+}
+
+.lp-footer__nota {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.lp-footer__links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lp-footer__links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bone-dim);
+  text-decoration: none;
+}
+
+.lp-footer__links a:hover {
+  color: var(--venom);
+}
+
+.lp-footer__inner {
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .lp-footer__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .lp-footer__grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+/* ==========================================================
+   Vídeos do TikTok e botões das redes sociais
+   ========================================================== */
+
+.lp-insta {
+  padding: 56px 0;
+  border-top: 1px solid var(--line);
+}
+
+.lp-insta__head {
+  align-items: flex-end;
+}
+
+.lp-redes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lp-rede {
+  gap: 10px;
+  text-align: left;
+}
+
+.lp-rede > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.lp-rede small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bone-dim);
+}
+
+.lp-rede__logo {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex: none;
+}
+
+.lp-rede__logo--p {
+  width: 16px;
+  height: 16px;
+}
+
+.lp-insta__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.lp-insta__item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Tela no formato vertical do TikTok (9:16) */
+.lp-insta__tela {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 640px;
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.lp-insta__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.lp-insta__ver {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--ink-900);
+  color: var(--bone);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lp-insta__ver:hover {
+  border-color: var(--venom);
+  color: var(--venom);
+}
+
+.lp-insta__grid.is-vazio {
+  display: block;
+}
+
+.lp-insta__convite {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 28px;
+  border: 1px solid var(--line);
+  background: linear-gradient(90deg, rgba(182, 255, 60, 0.08), transparent 70%);
+  color: var(--bone);
+  text-decoration: none;
+}
+
+.lp-insta__convite svg {
+  color: var(--venom);
+  flex: none;
+}
+
+.lp-insta__convite > span:not(.btn) {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--bone-dim);
+}
+
+.lp-insta__convite strong {
+  color: var(--bone);
+  font-size: 18px;
+}
+
+@media (max-width: 900px) {
+  .lp-insta__grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 420px;
+    margin: 0 auto;
+  }
+}

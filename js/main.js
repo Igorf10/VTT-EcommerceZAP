@@ -313,6 +313,111 @@
     renderizarProdutos();
   });
 
+  /* ---------------- Redes sociais + vídeos do TikTok (fim da página) ---------------- */
+  /* Player oficial do TikTok: toca sozinho, sem som e em loop (o TikTok permite).
+     Os players só carregam quando a seção chega perto da tela e pausam quando saem dela. */
+
+  (function () {
+    var perfilInsta = CONFIG.instagramUrl || 'https://www.instagram.com/vaniltotopteam/';
+    var perfilTikTok = CONFIG.tiktokUrl || 'https://www.tiktok.com/@vaniltoantunes';
+    var usuarioTikTok = '@' + perfilTikTok.replace(/\/+$/, '').split('/').pop().replace(/^@/, '');
+    var semMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    document.querySelectorAll('[data-instagram-link]').forEach(function (a) { a.href = perfilInsta; });
+    document.querySelectorAll('[data-instagram-usuario]').forEach(function (el) {
+      el.textContent = '@' + perfilInsta.replace(/\/+$/, '').split('/').pop();
+    });
+    document.querySelectorAll('[data-tiktok-link]').forEach(function (a) { a.href = perfilTikTok; });
+    document.querySelectorAll('[data-tiktok-usuario]').forEach(function (el) { el.textContent = usuarioTikTok; });
+
+    var caixa = document.getElementById('insta-videos');
+    if (!caixa) return;
+
+    // Número do vídeo: .../video/7412345678901234567 ou .../player/v1/7412...
+    function idTikTok(link) {
+      var m = /tiktok\.com\/(?:@[\w.-]+\/video|player\/v1|embed\/v2|embed)\/(\d{8,25})/i.exec(String(link || ''));
+      if (m) return m[1];
+      return /^\d{8,25}$/.test(String(link || '').trim()) ? String(link).trim() : '';
+    }
+
+    var avisou = false;
+    var ids = (CONFIG.tiktokVideos || []).map(function (v) {
+      var id = idTikTok(v);
+      if (!id && /tiktok\.com/i.test(String(v || '')) && !avisou) {
+        avisou = true;
+        console.warn('[VTT] Link do TikTok sem o número do vídeo (link curto?). Abra no navegador e copie o endereço completo, com /video/ e o número.');
+      }
+      return id;
+    }).filter(Boolean).slice(0, 3);
+
+    if (!ids.length) {
+      caixa.innerHTML =
+        '<a class="lp-insta__convite" href="' + escapar(perfilTikTok) + '" target="_blank" rel="noopener noreferrer">' +
+          '<svg width="40" height="40" aria-hidden="true"><use href="#i-video" /></svg>' +
+          '<span><strong>Acompanhe os vídeos da VTT</strong>Treinos, lançamentos e bastidores em ' + escapar(usuarioTikTok) + '</span>' +
+          '<span class="btn btn-primary">Ver no TikTok</span>' +
+        '</a>';
+      caixa.classList.add('is-vazio');
+      return;
+    }
+
+    function urlPlayer(id) {
+      var p = new URLSearchParams({
+        autoplay: semMovimento ? '0' : '1', loop: '1', controls: '1', progress_bar: '0', play_button: '1',
+        volume_control: '1', fullscreen_button: '0', timestamp: '0', music_info: '0', description: '0',
+        rel: '0', native_context_menu: '0', closed_caption: '0',
+      });
+      return 'https://www.tiktok.com/player/v1/' + id + '?' + p.toString();
+    }
+
+    caixa.innerHTML = ids.map(function (id, i) {
+      var link = 'https://www.tiktok.com/' + usuarioTikTok + '/video/' + id;
+      return '<div class="lp-insta__item">' +
+        '<div class="lp-insta__tela">' +
+          '<iframe class="lp-insta__frame" data-src="' + escapar(urlPlayer(id)) + '" title="Vídeo ' + (i + 1) + ' da VTT no TikTok"' +
+            ' allow="autoplay; fullscreen; encrypted-media; picture-in-picture" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
+        '</div>' +
+        '<a class="lp-insta__ver" href="' + escapar(link) + '" target="_blank" rel="noopener noreferrer">' +
+          '<svg width="16" height="16" aria-hidden="true"><use href="#i-video" /></svg> Ver no TikTok</a>' +
+      '</div>';
+    }).join('');
+
+    var players = Array.prototype.slice.call(caixa.querySelectorAll('.lp-insta__frame'));
+
+    function mandar(frame, tipo) {
+      try { frame.contentWindow.postMessage({ type: tipo, 'x-tiktok-player': true }, '*'); } catch (e) { /* ainda carregando */ }
+    }
+
+    // Player pronto: deixa mudo (o navegador só deixa tocar sozinho sem som) e dá o play
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || typeof d !== 'object' || !d['x-tiktok-player']) return;
+      var frame = players.filter(function (f) { return f.contentWindow === e.source; })[0];
+      if (!frame || d.type !== 'onPlayerReady') return;
+      frame.dataset.pronto = '1';
+      mandar(frame, 'mute');
+      if (!semMovimento && frame.dataset.visivel === '1') mandar(frame, 'play');
+    });
+
+    function ligar(frame) {
+      if (!frame.getAttribute('src')) frame.src = frame.getAttribute('data-src');
+      frame.dataset.visivel = '1';
+      if (frame.dataset.pronto === '1' && !semMovimento) mandar(frame, 'play');
+    }
+
+    if ('IntersectionObserver' in window) {
+      var obs = new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (e) {
+          if (e.isIntersecting) ligar(e.target);
+          else { e.target.dataset.visivel = '0'; if (e.target.dataset.pronto === '1') mandar(e.target, 'pause'); }
+        });
+      }, { threshold: 0.35, rootMargin: '200px 0px' });
+      players.forEach(function (f) { obs.observe(f); });
+    } else {
+      players.forEach(ligar);
+    }
+  })();
+
   /* ---------------- Busca no topo ---------------- */
 
   var topo = document.querySelector('.lp-top');

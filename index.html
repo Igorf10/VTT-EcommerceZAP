@@ -179,6 +179,30 @@
       </div>
     </section>
 
+    <!-- ================= Vídeos do TikTok + redes sociais ================= -->
+    <section class="lp-insta" id="videos">
+      <div class="container">
+        <div class="section__head lp-insta__head">
+          <div>
+            <h2 class="section__title">Siga a VTT no TikTok e no Instagram</h2>
+            <p class="section__hint">Treinos, lançamentos e bastidores da equipe.</p>
+          </div>
+          <div class="lp-redes">
+            <a class="btn btn-outline lp-rede" data-instagram-link href="https://www.instagram.com/vaniltotopteam/" target="_blank" rel="noopener noreferrer">
+              <img class="lp-rede__logo" src="img/redes/instagram.png" alt="" width="20" height="20" onerror="this.remove()" />
+              <span><small>Instagram</small><span data-instagram-usuario>@vaniltotopteam</span></span>
+            </a>
+            <a class="btn btn-outline lp-rede" data-tiktok-link href="https://www.tiktok.com/@vaniltoantunes" target="_blank" rel="noopener noreferrer">
+              <img class="lp-rede__logo" src="img/redes/tiktok.png" alt="" width="20" height="20" onerror="this.remove()" />
+              <span><small>TikTok</small><span data-tiktok-usuario>@vaniltoantunes</span></span>
+            </a>
+          </div>
+        </div>
+        <!-- Vídeos: links em js/config.js (tiktokVideos). Montados pelo js/main.js -->
+        <div class="lp-insta__grid" id="insta-videos"></div>
+      </div>
+    </section>
+
     <!-- ================= CTA final ================= -->
     <section class="lp-final">
       <div class="container lp-final__inner">
@@ -191,6 +215,59 @@
     </section>
 
     <footer class="lp-footer">
+      <div class="container lp-footer__grid">
+        <div class="lp-footer__col lp-footer__marca">
+          <a href="#inicio" class="brand">
+            <img src="img/logo-vtt.png" alt="VTT — Vanilto Top Team" class="brand__logo" />
+            <span class="lp-top__name">VTT <span>Store</span></span>
+          </a>
+          <p class="lp-footer__texto">Vista o treino. Vista a VTT.<br />Roupas de treino da Vanilto Top Team.</p>
+        </div>
+
+        <div class="lp-footer__col">
+          <h3 class="lp-footer__titulo">Formas de pagamento</h3>
+          <ul class="lp-selos" aria-label="Formas de pagamento aceitas">
+            <li class="lp-selo"><img src="img/selos/pix-icon.png" alt="Pix" loading="lazy" /><span>Pix</span></li>
+            <li class="lp-selo"><img src="img/selos/visa.png" alt="Visa" loading="lazy" /></li>
+            <li class="lp-selo"><img src="img/selos/mastercard.png" alt="Mastercard" loading="lazy" /></li>
+            <li class="lp-selo"><img src="img/selos/elo.png" alt="Elo" loading="lazy" /></li>
+          </ul>
+          <p class="lp-footer__nota">O pagamento é combinado no atendimento pelo WhatsApp.</p>
+        </div>
+
+        <div class="lp-footer__col">
+          <h3 class="lp-footer__titulo">Envio</h3>
+          <ul class="lp-selos" aria-label="Formas de envio">
+            <li class="lp-selo lp-selo--largo"><img src="img/selos/correios.png" alt="Correios" loading="lazy" /></li>
+            <li class="lp-selo lp-selo--largo"><img src="img/selos/jadlog.png" alt="Jadlog" loading="lazy" /></li>
+          </ul>
+          <p class="lp-footer__nota">Ou retire na academia.</p>
+        </div>
+
+        <div class="lp-footer__col">
+          <h3 class="lp-footer__titulo">Atendimento</h3>
+          <ul class="lp-footer__links">
+            <li>
+              <a href="#" data-whats="duvida" target="_blank" rel="noopener noreferrer">
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-whats" /></svg> <span data-whats-display>WhatsApp</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://www.instagram.com/vaniltotopteam/" data-instagram-link target="_blank" rel="noopener noreferrer">
+                <img class="lp-rede__logo lp-rede__logo--p" src="img/redes/instagram.png" alt="" width="16" height="16" onerror="this.remove()" /> Instagram <span data-instagram-usuario>@vaniltotopteam</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://www.tiktok.com/@vaniltoantunes" data-tiktok-link target="_blank" rel="noopener noreferrer">
+                <img class="lp-rede__logo lp-rede__logo--p" src="img/redes/tiktok.png" alt="" width="16" height="16" onerror="this.remove()" /> TikTok <span data-tiktok-usuario>@vaniltoantunes</span>
+              </a>
+            </li>
+            <li><a href="#produtos">Produtos</a></li>
+            <li><a href="#cadastro">Ganhe 10% OFF</a></li>
+          </ul>
+        </div>
+      </div>
+
       <div class="container lp-footer__inner">
         <span>© <span id="ano"></span> VTT — Vanilto Top Team</span>
         <span>Desenvolvido por: GuardData</span>
@@ -278,6 +355,9 @@
       </symbol>
       <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      </symbol>
+      <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="5" width="15" height="14" rx="2" /><path d="m17 10 5-3v10l-5-3" />
       </symbol>
       <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
